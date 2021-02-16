@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Subscriber\Oauth\Oauth1;
+use Mapper;
 
 class ClimateController extends Controller
 {
@@ -18,10 +19,9 @@ class ClimateController extends Controller
         'App-Id' => 'QaVMLPhm'
     ];
 
-    public function index(){
+    public function getLocation($location){
 
         $stack = HandlerStack::create();
-
         $middleware = new Oauth1($this->config);
         $stack->push($middleware);
 
@@ -31,22 +31,80 @@ class ClimateController extends Controller
             'auth' => 'oauth'
         ]);
 
-        $data = [
+        $headers = [
             'headers' => [
                 'X-Yahoo-App-Id' => $this->config['App-Id'],
-            ],
+            ]     
+        ];
+
+        $query = [
             'query' =>[
-                'location' => 'Miami',
+                'location' => $location,
                 'u' => 'c',
                 'format' => 'json'
             ]
         ];
 
       
-        $response = $client->get('forecastrss',$data);
-  
+        $response = $client->get('forecastrss',$query,$headers);
         $body = $response->getBody()->getContents();
-        print_r($body);
-        exit;
+        $body = json_decode($body, true);
+        
+        return $body;
+
+    }
+
+    public function index(){
+
+        $dataMiami = $this->getLocation('Miami');
+       
+        Mapper::map($dataMiami['location']['lat'], $dataMiami['location']['long'], [
+            'zoom' => 5,
+            'center' => true, 
+            'marker' => false, 
+            'markers' => [
+                'title' => $dataMiami['location']['city'], 
+                'icon' => 'img/humedad.png' 
+            ],
+        ]);
+
+        Mapper::informationWindow(
+            $dataMiami['location']['lat'], $dataMiami['location']['long'], 
+            "<b>".$dataMiami['location']['city']."</b><br><br><b>Humedad: </b> ".$dataMiami['current_observation']['atmosphere']['humidity'],
+            [
+                'marker' => true,
+                    'title' => $dataMiami['location']['city'], 
+                    'icon' => 'img/humedad.png' 
+            ]
+        );
+
+
+        $dataOrlando = $this->getLocation('Orlando');
+
+        Mapper::informationWindow(
+            $dataOrlando['location']['lat'], $dataOrlando['location']['long'], 
+            "<b>".$dataOrlando['location']['city']."</b><br><br><b>Humedad: </b> ".$dataOrlando['current_observation']['atmosphere']['humidity'],
+            [
+                'marker' => true,
+                    'title' => $dataOrlando['location']['city'], 
+                    'icon' => 'img/humedad.png' 
+            ]
+        );
+
+        $dataNewYork = $this->getLocation('New York');
+        
+        Mapper::informationWindow(
+            $dataNewYork['location']['lat'], $dataNewYork['location']['long'], 
+            "<b>".$dataNewYork['location']['city']."</b><br><br><b>Humedad: </b> ".$dataNewYork['current_observation']['atmosphere']['humidity'],
+            [
+                'marker' => true,
+                    'title' => $dataNewYork['location']['city'], 
+                    'icon' => 'img/humedad.png' 
+            ]
+        );
+
+        
+        return view('climate');
+      
     }
 }
