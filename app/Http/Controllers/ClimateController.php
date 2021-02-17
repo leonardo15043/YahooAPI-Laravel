@@ -7,6 +7,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Subscriber\Oauth\Oauth1;
 use Mapper;
+use App\Climate;
 
 class ClimateController extends Controller
 {
@@ -24,6 +25,7 @@ class ClimateController extends Controller
         $stack = HandlerStack::create();
         $middleware = new Oauth1($this->config);
         $stack->push($middleware);
+        
 
         $client = new Client([
             'base_uri' => 'https://weather-ydn-yql.media.yahoo.com/',
@@ -45,10 +47,12 @@ class ClimateController extends Controller
             ]
         ];
 
-      
+        
         $response = $client->get('forecastrss',$query,$headers);
         $body = $response->getBody()->getContents();
         $body = json_decode($body, true);
+
+        $this->saveReport($body['location']['city'],$body['current_observation']['atmosphere']['humidity']);
         
         return $body;
 
@@ -74,7 +78,7 @@ class ClimateController extends Controller
             [
                 'marker' => true,
                     'title' => $dataMiami['location']['city'], 
-                    'icon' => 'img/humedad.png' 
+                    'icon' => 'assets/img/humedad.png' 
             ]
         );
 
@@ -87,24 +91,39 @@ class ClimateController extends Controller
             [
                 'marker' => true,
                     'title' => $dataOrlando['location']['city'], 
-                    'icon' => 'img/humedad.png' 
+                    'icon' => 'assets/img/humedad.png' 
             ]
         );
 
         $dataNewYork = $this->getLocation('New York');
-        
+
         Mapper::informationWindow(
             $dataNewYork['location']['lat'], $dataNewYork['location']['long'], 
             "<b>".$dataNewYork['location']['city']."</b><br><br><b>Humedad: </b> ".$dataNewYork['current_observation']['atmosphere']['humidity'],
             [
                 'marker' => true,
                     'title' => $dataNewYork['location']['city'], 
-                    'icon' => 'img/humedad.png' 
+                    'icon' => 'assets/img/humedad.png' 
             ]
         );
 
-        
-        return view('climate');
+        $history = Climate::all();
+
+        return view('climate',compact('history'));
       
+    }
+
+    public function saveReport($city,$humidity)
+    {
+        $coincidence = Climate::where('humidity', $humidity)->where('city', $city)->whereDay('created_at', '=', date('d'))->whereMonth('created_at', '=', date('m'))->whereYear('created_at', '=', date('Y'))->count();
+ 
+        if($coincidence == 0){
+            $climate = new Climate([
+                'city' => $city,
+                'humidity' => $humidity
+            ]);
+            $climate->save();
+        }
+       
     }
 }
